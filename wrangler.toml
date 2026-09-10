@@ -1,0 +1,16 @@
+name = "empty-tooth-4905"
+main = "worker.js"
+compatibility_date = "2026-09-10"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Set these as encrypted secrets with `wrangler secret put`:
+# RAZORPAY_KEY_ID
+# RAZORPAY_KEY_SECRET
+# ACCESS_TOKEN_SECRET
+# RAZORPAY_WEBHOOK_SECRET
+
+[vars]
+PAYMENT_MODE = "test"
