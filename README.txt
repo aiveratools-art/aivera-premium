@@ -44,3 +44,4 @@ This package is locked to Razorpay TEST mode. It rejects a live key ID (rzp_live
 5. Use Razorpay's official Test Mode payment credentials shown in its Test Mode documentation/checkout.
 
 IMPORTANT: Do not paste secret keys into the website HTML or commit them to the ZIP.
+ 
