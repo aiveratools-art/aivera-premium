@@ -33,7 +33,12 @@ async function createOrder(request, env) {
     body:JSON.stringify({amount:2000,currency:'INR',receipt,notes:{product:'AIvera Premium Access',source:'website'}})
   });
   const d = await r.json();
-  if (!r.ok) return json({error:'Razorpay order creation failed',details:d},502);
+  if (!r.ok) return json({
+    error:'Razorpay order creation failed',
+    razorpay_status:r.status,
+    razorpay_code:d?.error?.code || null,
+    razorpay_description:d?.error?.description || null
+  },502);
   return json({key_id:env.RAZORPAY_KEY_ID,order_id:d.id,amount:d.amount,currency:d.currency,mode:env.PAYMENT_MODE || 'test'});
 }
 
