@@ -1,95 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>AIvera Premium</title>
 
   <style>
-    * {
-      box-sizing: border-box;
+    body{
+      margin:0;
+      min-height:100vh;
+      background:#050914;
+      color:white;
+      font-family:Arial,sans-serif;
+      display:flex;
+      justify-content:center;
+      align-items:center;
     }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #050914;
-      color: white;
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
+    .box{
+      width:90%;
+      max-width:600px;
+      text-align:center;
+      padding:30px;
     }
 
-    .box {
-      width: 100%;
-      max-width: 620px;
-      padding: 35px 25px;
-      text-align: center;
+    h1{
+      color:#29a9ff;
+      font-size:42px;
     }
 
-    h1 {
-      margin: 0 0 12px;
-      font-size: 42px;
-      color: #29a9ff;
+    input{
+      width:100%;
+      height:58px;
+      box-sizing:border-box;
+      margin:10px 0;
+      padding:15px;
+      border-radius:12px;
+      border:1px solid #52709b;
+      background:#07132d;
+      color:white;
+      font-size:18px;
     }
 
-    .sub {
-      font-size: 18px;
-      margin-bottom: 30px;
-      color: #ddd;
+    button{
+      width:100%;
+      height:58px;
+      margin:10px 0;
+      border:0;
+      border-radius:12px;
+      background:#269cff;
+      color:white;
+      font-size:18px;
+      font-weight:bold;
+      cursor:pointer;
+      position:relative;
+      z-index:9999;
     }
 
-    input {
-      width: 100%;
-      height: 58px;
-      border-radius: 12px;
-      border: 1px solid #52709b;
-      background: #07132d;
-      color: white;
-      padding: 0 18px;
-      font-size: 18px;
-      outline: none;
-      margin-bottom: 12px;
-    }
-
-    button {
-      width: 100%;
-      height: 58px;
-      border: 0;
-      border-radius: 12px;
-      background: #269cff;
-      color: white;
-      font-size: 18px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 12px;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    button:disabled{
+      opacity:.6;
     }
 
     #otpBox,
-    #payBox {
-      display: none;
-      margin-top: 10px;
+    #payBox{
+      display:none;
     }
 
-    #msg {
-      min-height: 28px;
-      margin-top: 10px;
-      color: #ffd84d;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .small {
-      color: #999;
-      font-size: 13px;
-      margin-top: 12px;
+    #msg{
+      min-height:30px;
+      margin-top:15px;
+      color:#ffd84d;
+      white-space:pre-wrap;
     }
   </style>
 </head>
@@ -100,9 +81,7 @@
 
   <h1>AIvera Premium</h1>
 
-  <div class="sub">
-    Premium AI Tools Directory Access
-  </div>
+  <p>Premium AI Tools Directory Access</p>
 
   <div id="loginBox">
 
@@ -114,11 +93,14 @@
       placeholder="Enter 10-digit mobile number"
     >
 
-    <button id="sendBtn" onclick="sendOTP()">
+    <button
+      type="button"
+      id="sendBtn">
       Send OTP
     </button>
 
   </div>
+
 
   <div id="otpBox">
 
@@ -130,15 +112,16 @@
       placeholder="Enter OTP"
     >
 
-    <button id="verifyBtn" onclick="verifyOTP()">
+    <button type="button" id="verifyBtn">
       Verify OTP
     </button>
 
-    <button id="resendBtn" onclick="resendOTP()">
+    <button type="button" id="resendBtn">
       Resend OTP
     </button>
 
   </div>
+
 
   <div id="payBox">
 
@@ -146,91 +129,48 @@
 
     <p>One-time payment: ₹20</p>
 
-    <button onclick="payNow()">
+    <button type="button" id="payBtn">
       Pay ₹20
     </button>
 
   </div>
 
-  <div id="msg"></div>
 
-  <div class="small">
-    Secure OTP verification powered by MSG91
-  </div>
+  <div id="msg"></div>
 
 </div>
 
 
+<!-- ================================================= -->
+<!-- ALL JAVASCRIPT IS HERE -->
+<!-- ================================================= -->
+
 <script>
 
-  /* =====================================================
-     MSG91 CONFIGURATION
-     EXACT VALUES FROM YOUR MSG91 INTEGRATION SCREEN
-     ===================================================== */
+const WIDGET_ID = "36696b634d3333333836323336";
 
-  const WIDGET_ID = "36696b634d3333333836323336";
+const TOKEN = "569942T8YbLOWaARc6aa3789aP1";
 
-  const TOKEN = "569942T8YbLOWaARc6aa3789aP1";
+let reqId = "";
 
-
-  let reqId = "";
-
-  let ready = false;
+let msg91Ready = false;
 
 
-  function show(message) {
-    document.getElementById("msg").textContent = message || "";
-  }
+function show(text) {
+  document.getElementById("msg").textContent = text;
+}
 
 
-  function cleanMobile() {
+/* =========================
+   SEND OTP BUTTON
+   ========================= */
 
-    let mobile =
-      document.getElementById("mobile").value
-        .replace(/\D/g, "");
+document.getElementById("sendBtn").addEventListener("click", function () {
 
-    if (mobile.startsWith("91") && mobile.length === 12) {
-      mobile = mobile.substring(2);
-    }
+  const mobile =
+    document.getElementById("mobile").value
+      .replace(/\D/g, "");
 
-    return mobile;
-  }
+  if (mobile.length !== 10) {
 
-
-  function fullMobile() {
-
-    const mobile = cleanMobile();
-
-    return "91" + mobile;
-  }
-
-
-  function checkMobile() {
-
-    const mobile = cleanMobile();
-
-    if (mobile.length !== 10) {
-
-      show("Please enter a valid 10-digit mobile number.");
-
-      return false;
-    }
-
-    return true;
-  }
-
-
-  /*
-   * MSG91 SUCCESS CALLBACK
-   */
-  function msg91Success(data) {
-
-    console.log("MSG91 SUCCESS:", data);
-
-    /*
-     * Do not automatically verify here.
-     * Send OTP only stores reqId.
-     */
-
-    if (data && data.reqId) {
-      reqId =
+    show("Please
