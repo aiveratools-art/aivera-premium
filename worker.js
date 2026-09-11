@@ -2,13 +2,16 @@ const ACCESS_COOKIE = "aivera_premium";
 const PHONE_COOKIE = "aivera_verified_phone";
 const ACCESS_SECONDS = 60 * 60 * 24 * 30;
 const PHONE_SECONDS = 60 * 60 * 2;
+const OTP_SECONDS = 10 * 60;
+const OTP_COOKIE = "aivera_2factor_otp";
 const PREMIUM_AMOUNT = 9900;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
-      if (request.method === "POST" && url.pathname === "/api/msg91/verify") return await verifyMsg91(request, env);
+      if (request.method === "POST" && url.pathname === "/api/send-otp") return await sendOtp2Factor(request, env);
+      if (request.method === "POST" && url.pathname === "/api/verify-otp") return await verifyOtp2Factor(request, env);
       if (request.method === "POST" && url.pathname === "/api/create-order") return await createOrder(request, env);
       if (request.method === "POST" && url.pathname === "/api/verify-payment") return await verifyPayment(request, env);
       if (request.method === "POST" && url.pathname === "/api/razorpay-webhook") return await webhook(request, env);
@@ -50,99 +53,89 @@ function normalizePhone(value) {
   return "";
 }
 
-async function verifyMsg91(request, env) {
-  if (!env.MSG91_AUTHKEY || !env.ACCESS_TOKEN_SECRET || !env.DB) {
-    return json({ error: "MSG91/D1 server configuration is incomplete." }, 503);
+async function sendOtp2Factor(request, env) {
+  if (!env.TWOFACTOR_API_KEY || !env.ACCESS_TOKEN_SECRET || !env.DB) {
+    return json({ error: "2Factor/D1 server configuration is incomplete." }, 503);
   }
 
   let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Invalid JSON request." }, 400);
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON request." }, 400); }
+
+  const phone = normalizePhone(body?.phone);
+  if (!phone) return json({ error: "Please enter a valid 10-digit mobile number." }, 400);
+
+  const url = `https://2factor.in/API/V1/${encodeURIComponent(env.TWOFACTOR_API_KEY)}/SMS/${encodeURIComponent(phone)}/AUTOGEN`;
+  const r = await fetch(url, { method: "GET" });
+  const text = await r.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+
+  if (!r.ok || String(data?.Status || "").toLowerCase() !== "success" || !data?.Details) {
+    console.error("2Factor send OTP failed:", r.status, text);
+    return json({ error: "OTP could not be sent. Please try again.", provider_status: r.status }, 502);
   }
 
-  const accessToken = String(body?.accessToken || body?.["access-token"] || "").trim();
-  if (!accessToken) return json({ error: "MSG91 access token missing." }, 400);
-
-  const verified = await msg91VerifyAccessToken(accessToken, env.MSG91_AUTHKEY);
-  if (!verified.ok) return json({ error: "MSG91 access-token verification failed." }, 401);
-
-  const phone = normalizePhone(
-    verified.mobile ||
-    verified.phone ||
-    verified.identifier ||
-    verified.data?.mobile ||
-    verified.data?.phone
+  const now = Math.floor(Date.now() / 1000);
+  const otpToken = await makeToken(
+    { sub: "otp_session", phone, sid: String(data.Details), exp: now + OTP_SECONDS },
+    env.ACCESS_TOKEN_SECRET
   );
 
-  if (!phone) return json({ error: "Verified mobile number was not returned by MSG91." }, 400);
+  return json(
+    { ok: true, message: "OTP sent successfully." },
+    200,
+    { "Set-Cookie": `${OTP_COOKIE}=${otpToken}; Max-Age=${OTP_SECONDS}; Path=/; Secure; HttpOnly; SameSite=Lax` }
+  );
+}
+async function verifyOtp2Factor(request, env) {
+  if (!env.TWOFACTOR_API_KEY || !env.ACCESS_TOKEN_SECRET || !env.DB) {
+    return json({ error: "2Factor/D1 server configuration is incomplete." }, 503);
+  }
 
+  const otpCookie = cookieValue(request.headers.get("Cookie") || "", OTP_COOKIE);
+  const session = await readToken(otpCookie, env.ACCESS_TOKEN_SECRET);
+  if (!session || session.sub !== "otp_session" || !session.phone || !session.sid) {
+    return json({ error: "OTP session expired. Please send OTP again." }, 401);
+  }
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid JSON request." }, 400); }
+  const otp = String(body?.otp || "").replace(/\D/g, "");
+  if (!otp) return json({ error: "Please enter the OTP." }, 400);
+
+  const url = `https://2factor.in/API/V1/${encodeURIComponent(env.TWOFACTOR_API_KEY)}/SMS/VERIFY/${encodeURIComponent(session.sid)}/${encodeURIComponent(otp)}`;
+  const r = await fetch(url, { method: "GET" });
+  const text = await r.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+
+  if (!r.ok || String(data?.Status || "").toLowerCase() !== "success") {
+    return json({ error: "Incorrect or expired OTP. Please try again." }, 401);
+  }
+
+  const phone = normalizePhone(session.phone);
   const row = await env.DB.prepare(
     "SELECT premium FROM users WHERE phone = ?1 LIMIT 1"
   ).bind(phone).first();
 
+  const now = Math.floor(Date.now() / 1000);
   const phoneToken = await makeToken(
-    { sub: "verified_phone", phone, exp: Math.floor(Date.now() / 1000) + PHONE_SECONDS },
+    { sub: "verified_phone", phone, exp: now + PHONE_SECONDS },
     env.ACCESS_TOKEN_SECRET
   );
-
-  const phoneCookie =
-    `${PHONE_COOKIE}=${phoneToken}; Max-Age=${PHONE_SECONDS}; Path=/; Secure; HttpOnly; SameSite=Lax`;
+  const response = json({ premium: Number(row?.premium) === 1 });
+  response.headers.append("Set-Cookie", `${PHONE_COOKIE}=${phoneToken}; Max-Age=${PHONE_SECONDS}; Path=/; Secure; HttpOnly; SameSite=Lax`);
+  response.headers.append("Set-Cookie", `${OTP_COOKIE}=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Lax`);
 
   if (Number(row?.premium) === 1) {
     const premiumToken = await makeToken(
-      { sub: "premium", phone, exp: Math.floor(Date.now() / 1000) + ACCESS_SECONDS },
+      { sub: "premium", phone, exp: now + ACCESS_SECONDS },
       env.ACCESS_TOKEN_SECRET
     );
-
-    const response = json({ premium: true });
-    response.headers.append("Set-Cookie", phoneCookie);
-    response.headers.append(
-      "Set-Cookie",
-      `${ACCESS_COOKIE}=${premiumToken}; Max-Age=${ACCESS_SECONDS}; Path=/; Secure; HttpOnly; SameSite=Lax`
-    );
-    return response;
+    response.headers.append("Set-Cookie", `${ACCESS_COOKIE}=${premiumToken}; Max-Age=${ACCESS_SECONDS}; Path=/; Secure; HttpOnly; SameSite=Lax`);
   }
 
-  const response = json({ premium: false });
-  response.headers.append("Set-Cookie", phoneCookie);
   return response;
-}
-
-async function msg91VerifyAccessToken(accessToken, authkey) {
-  const attempts = [
-    {
-      url: "https://api.msg91.com/api/v5/widget/verifyAccessToken",
-      body: JSON.stringify({ "access-token": accessToken })
-    },
-    {
-      url: "https://control.msg91.com/api/v5/widget/verifyAccessToken",
-      body: JSON.stringify({ "access-token": accessToken })
-    },
-    {
-      url: "https://api.msg91.com/api/v5/widget/verifyAccessToken",
-      body: JSON.stringify({ accessToken })
-    }
-  ];
-
-  for (const attempt of attempts) {
-    try {
-      const r = await fetch(attempt.url, {
-        method: "POST",
-        headers: {
-          authkey,
-          "Content-Type": "application/json",
-          Accept: "application/json"
-        },
-        body: attempt.body
-      });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok) return { ok: true, ...data };
-    } catch (_) {}
-  }
-
-  return { ok: false };
 }
 
 async function getVerifiedPhone(request, env) {
@@ -198,7 +191,6 @@ async function createOrder(request, env) {
 
   const receipt =
     "aivera_" + crypto.randomUUID().replaceAll("-", "").slice(0, 24);
-
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: {
@@ -318,7 +310,6 @@ async function verifyPayment(request, env) {
     "captured",
     now
   ).run();
-
   await env.DB.prepare(`
     INSERT INTO users
       (phone, premium, payment_id, created_at, updated_at)
@@ -417,7 +408,7 @@ async function webhook(request, env) {
         ) {
           await env.DB.prepare(`
             INSERT INTO users
-            (phone, premium, payment_id, created_at, updated_at)
+              (phone, premium, payment_id, created_at, updated_at)
             VALUES (?1, 1, ?2, ?3, ?3)
             ON CONFLICT(phone) DO UPDATE SET
               premium = 1,
@@ -437,7 +428,6 @@ async function webhook(request, env) {
 
   return new Response("ok");
 }
-
 async function validAccess(cookieHeader, env) {
   if (!env.ACCESS_TOKEN_SECRET || !env.DB) return false;
 
@@ -505,7 +495,6 @@ async function hmacHex(secret, data) {
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");
 }
-
 function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) {
     return false;
@@ -518,5 +507,3 @@ function timingSafeEqual(a, b) {
 
   return result === 0;
 }
-            
-        
