@@ -1,829 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AIvéra Premium</title>
-
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
-<style>
-*{box-sizing:border-box}
-body{
-margin:0;
-min-height:100vh;
-background:#080808;
-color:#fff;
-font-family:Arial,sans-serif;
-display:flex;
-align-items:center;
-justify-content:center;
-padding:20px
-}
-.card{
-width:100%;
-max-width:460px;
-background:#111;
-border:1px solid #292929;
-border-radius:22px;
-padding:32px 24px;
-text-align:center
-}
-.logo{
-font-size:34px;
-font-weight:800
-}
-.logo span{color:#d9b866}
-h1{font-size:25px;margin:16px 0 10px}
-.sub{
-color:#aaa;
-line-height:1.5;
-margin-bottom:25px
-}
-input{
-width:100%;
-padding:15px;
-margin-bottom:12px;
-border-radius:12px;
-border:1px solid #444;
-background:#181818;
-color:#fff;
-font-size:17px;
-outline:none
-}
-button{
-width:100%;
-padding:15px;
-border:0;
-border-radius:12px;
-background:#d9b866;
-color:#080808;
-font-size:16px;
-font-weight:800;
-cursor:pointer
-}
-button:disabled{
-opacity:.5;
-cursor:not-allowed
-}
-.secondary{
-margin-top:10px;
-background:#222;
-color:#fff
-}
-.hidden{display:none}
-.msg{
-display:none;
-margin-top:15px;
-padding:12px;
-border-radius:10px;
-background:#191919;
-color:#ddd;
-font-size:14px;
-line-height:1.4
-}
-#captcha{
-margin:10px 0
-}
-.small{
-margin-top:18px;
-font-size:12px;
-color:#777
-}
-</style>
-</head>
-
-<body>
-
-<div class="card">
-
-<div class="logo">AI<span>véra</span></div>
-
-<h1>Premium AI Tools Directory</h1>
-
-<div class="sub">
-Verify your mobile number to continue.<br>
-One-time ₹20 payment unlocks Premium permanently for this number.
-</div>
-
-<div id="mobileBox">
-
-<input
-id="phone"
-type="tel"
-inputmode="numeric"
-maxlength="10"
-placeholder="Enter 10-digit mobile number">
-
-<div id="captcha"></div>
-
-<button id="sendBtn">Send OTP</button>
-
-</div>
-
-
-<div id="otpBox" class="hidden">
-
-<input
-id="otp"
-type="tel"
-inputmode="numeric"
-maxlength="4"
-placeholder="Enter 4-digit OTP">
-
-<button id="verifyBtn">Verify OTP</button>
-
-<button id="retryBtn" class="secondary">
-Resend OTP
-</button>
-
-</div>
-
-
-<div id="payBox" class="hidden">
-
-<div class="sub">
-Your mobile number is verified.<br>
-Pay ₹20 once to unlock Premium.
-</div>
-
-<button id="payBtn">
-Unlock AIvéra — Pay ₹20
-</button>
-
-</div>
-
-
-<div id="msg" class="msg"></div>
-
-<div class="small">
-Secure OTP verification • Secure Razorpay payment
-</div>
-
-</div>
-
-
-<script>
-
-/* =========================
-   MSG91 CONFIG
-========================= */
-
-const MSG91_WIDGET_ID =
-'36696b634d3333333338363236';
-
-const MSG91_TOKEN =
-'569942T8YbLOWaARC6aa3789aP1';
-
-let reqId = null;
-
-
-/* =========================
-   ELEMENTS
-========================= */
-
-const mobileBox =
-document.getElementById('mobileBox');
-
-const otpBox =
-document.getElementById('otpBox');
-
-const payBox =
-document.getElementById('payBox');
-
-const phone =
-document.getElementById('phone');
-
-const otp =
-document.getElementById('otp');
-
-const sendBtn =
-document.getElementById('sendBtn');
-
-const verifyBtn =
-document.getElementById('verifyBtn');
-
-const retryBtn =
-document.getElementById('retryBtn');
-
-const payBtn =
-document.getElementById('payBtn');
-
-const msg =
-document.getElementById('msg');
-
-
-function show(text){
-msg.textContent=text;
-msg.style.display='block';
-}
-
-
-function hide(){
-msg.style.display='none';
-}
-
-
-/* =========================
-   MSG91 CONFIGURATION
-========================= */
-
-var configuration = {
-
-widgetId: MSG91_WIDGET_ID,
-
-tokenAuth: MSG91_TOKEN,
-
-identifier: '',
-
-exposeMethods: true,
-
-captchaRenderId: 'captcha',
-
-success: function(data){
-console.log('MSG91 success:',data);
-},
-
-failure: function(error){
-console.log('MSG91 failure:',error);
-}
-
-};
-
-
-/* =========================
-   ACCESS TOKEN
-========================= */
-
-function getAccessToken(data){
-
-if(!data) return null;
-
-if(typeof data === 'string'){
-return data;
-}
-
-return (
-data.access_token ||
-data.accessToken ||
-data.token ||
-data.data?.access_token ||
-data.data?.accessToken ||
-data.data?.token ||
-null
-);
-
-}
-
-
-/* =========================
-   SEND OTP
-========================= */
-
-sendBtn.onclick=function(){
-
-hide();
-
-const number =
-phone.value.replace(/\D/g,'');
-
-if(number.length!==10){
-
-show(
-'Please enter a valid 10-digit mobile number.'
-);
-
-return;
-
-}
-
-if(
-typeof window.sendOtp !== 'function'
-){
-
-show(
-'MSG91 is still loading. Please wait 2 seconds and try again.'
-);
-
-return;
-
-}
-
-sendBtn.disabled=true;
-
-show('Sending OTP...');
-
-
-window.sendOtp(
-
-'91'+number,
-
-function(data){
-
-console.log('SEND OTP RESPONSE:',data);
-
-reqId =
-data?.reqId ||
-data?.req_id ||
-data?.data?.reqId ||
-data?.data?.req_id ||
-null;
-
-if(!reqId){
-
-sendBtn.disabled=false;
-
-show(
-'MSG91 did not return a request ID. Please try again.'
-);
-
-return;
-
-}
-
-mobileBox.style.display='none';
-
-otpBox.classList.remove('hidden');
-
-sendBtn.disabled=false;
-
-show(
-'OTP sent successfully. Enter the 4-digit OTP.'
-);
-
-},
-
-function(error){
-
-console.error('SEND OTP ERROR:',error);
-
-sendBtn.disabled=false;
-
-show(
-'OTP send failed. Please try again.'
-);
-
-}
-
-);
-
-};
-
-
-/* =========================
-   VERIFY OTP
-========================= */
-
-verifyBtn.onclick=function(){
-
-hide();
-
-const code =
-otp.value.replace(/\D/g,'');
-
-if(code.length!==4){
-
-show('Enter the 4-digit OTP.');
-
-return;
-
-}
-
-if(!reqId){
-
-show(
-'OTP session expired. Please request a new OTP.'
-);
-
-return;
-
-}
-
-verifyBtn.disabled=true;
-
-show('Verifying OTP...');
-
-
-window.verifyOtp(
-
-Number(code),
-
-async function(data){
-
-console.log(
-'VERIFY OTP RESPONSE:',
-data
-);
-
-const accessToken =
-getAccessToken(data);
-
-if(!accessToken){
-
-verifyBtn.disabled=false;
-
-show(
-'OTP verified, but MSG91 access token was not received.'
-);
-
-return;
-
-}
-
-await verifyWithServer(accessToken);
-
-},
-
-function(error){
-
-console.error(
-'VERIFY OTP ERROR:',
-error
-);
-
-verifyBtn.disabled=false;
-
-show(
-'Invalid or expired OTP.'
-);
-
-},
-
-reqId
-
-);
-
-};
-
-
-/* =========================
-   SERVER LOGIN
-========================= */
-
-async function verifyWithServer(accessToken){
-
-try{
-
-const response =
-await fetch(
-'/api/msg91/verify',
-{
-method:'POST',
-headers:{
-'content-type':'application/json'
-},
-body:JSON.stringify({
-accessToken:accessToken
-})
-}
-);
-
-const data =
-await response.json();
-
-if(!response.ok){
-
-throw new Error(
-data.error ||
-'Server verification failed.'
-);
-
-}
-
-if(data.premium){
-
-show(
-'Premium already unlocked. Opening AIvéra...'
-);
-
-setTimeout(
-function(){
-location.href='/directory.html';
-},
-700
-);
-
-return;
-
-}
-
-otpBox.classList.add('hidden');
-
-payBox.classList.remove('hidden');
-
-show(
-'Mobile verified. Pay ₹20 to unlock Premium.'
-);
-
-}catch(error){
-
-console.error(error);
-
-verifyBtn.disabled=false;
-
-show(
-error.message ||
-'Verification failed.'
-);
-
-}
-
-}
-
-
-/* =========================
-   RESEND OTP
-========================= */
-
-retryBtn.onclick=function(){
-
-if(!reqId){
-
-show(
-'Please request OTP again.'
-);
-
-return;
-
-}
-
-retryBtn.disabled=true;
-
-show('Resending OTP...');
-
-
-window.retryOtp(
-
-null,
-
-function(data){
-
-console.log(
-'RETRY RESPONSE:',
-data
-);
-
-reqId =
-data?.reqId ||
-data?.req_id ||
-data?.data?.reqId ||
-data?.data?.req_id ||
-reqId;
-
-retryBtn.disabled=false;
-
-show(
-'OTP resent successfully.'
-);
-
-},
-
-function(error){
-
-console.error(error);
-
-retryBtn.disabled=false;
-
-show(
-'Could not resend OTP.'
-);
-
-},
-
-reqId
-
-);
-
-};
-
-
-/* =========================
-   PAYMENT
-========================= */
-
-payBtn.onclick=async function(){
-
-payBtn.disabled=true;
-
-show(
-'Creating secure payment...'
-);
-
-try{
-
-const response =
-await fetch(
-'/api/create-order',
-{
-method:'POST',
-headers:{
-'content-type':'application/json'
-},
-body:'{}'
-}
-);
-
-const data =
-await response.json();
-
-if(!response.ok){
-
-throw new Error(
-data.error ||
-'Could not create order.'
-);
-
-}
-
-if(data.premium){
-
-location.href='/directory.html';
-
-return;
-
-}
-
-
-const razorpay =
-new Razorpay({
-
-key:data.key_id,
-
-amount:data.amount,
-
-currency:data.currency,
-
-name:'AIvéra',
-
-description:
-'AIvéra Premium — 1,000+ AI Apps',
-
-order_id:data.order_id,
-
-theme:{
-color:'#d9b866'
-},
-
-handler:async function(result){
-
-show(
-'Payment successful. Verifying...'
-);
-
-try{
-
-const verifyResponse =
-await fetch(
-'/api/verify-payment',
-{
-method:'POST',
-headers:{
-'content-type':'application/json'
-},
-body:JSON.stringify(result)
-}
-);
-
-const verifyData =
-await verifyResponse.json();
-
-if(
-!verifyResponse.ok ||
-!verifyData.ok
-){
-
-throw new Error(
-verifyData.error ||
-'Payment verification failed.'
-);
-
-}
-
-show(
-'Premium unlocked successfully!'
-);
-
-setTimeout(
-function(){
-location.href='/directory.html';
-},
-700
-);
-
-}catch(error){
-
-payBtn.disabled=false;
-
-show(
-error.message
-);
-
-}
-
-},
-
-modal:{
-ondismiss:function(){
-
-payBtn.disabled=false;
-
-show(
-'Payment window closed.'
-);
-
-},
-
-escape:false
-
-}
-
-});
-
-razorpay.open();
-
-}catch(error){
-
-console.error(error);
-
-payBtn.disabled=false;
-
-show(
-error.message ||
-'Payment failed.'
-);
-
-}
-
-};
-
-
-/* =========================
-   EXISTING SESSION
-========================= */
-
-async function checkSession(){
-
-try{
-
-const response =
-await fetch('/api/session');
-
-const data =
-await response.json();
-
-if(
-data.loggedIn &&
-data.premium
-){
-
-show(
-'Premium already unlocked. Opening AIvéra...'
-);
-
-mobileBox.style.display='none';
-
-setTimeout(
-function(){
-location.href='/directory.html';
-},
-500
-);
-
-}
-
-else if(data.loggedIn){
-
-mobileBox.style.display='none';
-
-payBox.classList.remove('hidden');
-
-show(
-'Mobile verified. Pay ₹20 to unlock Premium.'
-);
-
-}
-
-}catch(error){
-
-console.log(
-'Session check:',
-error
-);
-
-}
-
-}
-
-checkSession();
-
-</script>
-
-
-<script
-type="text/javascript"
-onload="initSendOTP(configuration)"
-src="https://verify.msg91.com/otp-provider.js">
-</script>
-
-</body>
-</html>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>AIvera Premium</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      background: #080808;
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: #111;
+      border: 1px solid #292929;
+      border-radius: 28px;
+      padding: 42px 34px 34px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 20px;
+    }
+
+    .logo .ai {
+      color: #fff;
+    }
+
+    .logo .vera {
+      color: #dfbd61;
+    }
+
+    h1 {
+      font-size: 30px;
+      margin: 0 0 14px;
+    }
+
+    .subtitle {
+      color: #aaa;
+      font-size: 16px;
+      line-height: 1.65;
+      margin-bottom: 28px;
+    }
+
+    .input {
+      width: 100%;
+      height: 58px;
+      border: 1px solid #444;
+      border-radius: 15px;
+      background: #edf3ff;
+      color: #111;
+      font-size: 18px;
+      padding: 0 18px;
+      outline: none;
+      margin-bottom: 14px;
+    }
+
+    .input:focus {
+      border-color: #dfbd61;
+    }
+
+    .btn {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 15px;
+      background: #dfbd61;
+      color: #090909;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 18px;
+      margin-top: 4px;
+    }
+
+    .btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .btn.secondary {
+      background: #242424;
+      color: #fff;
+      border: 1px solid #3b3b3b;
+    }
+
+    .message {
+      margin-top: 18px;
+      min-height: 48px;
+      border-radius: 14px;
+      background: #191919;
+      color: #c
