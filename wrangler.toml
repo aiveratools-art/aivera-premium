@@ -5,6 +5,7 @@ compatibility_date = "2026-09-10"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+run_worker_first = true
 
 # Set these as encrypted secrets with `wrangler secret put`:
 # RAZORPAY_KEY_ID
