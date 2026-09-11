@@ -1,76 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AIvera Premium</title>
 
   <style>
-    body{
-      margin:0;
-      min-height:100vh;
-      background:#050914;
-      color:white;
-      font-family:Arial,sans-serif;
-      display:flex;
-      justify-content:center;
-      align-items:center;
+    * {
+      box-sizing: border-box;
     }
 
-    .box{
-      width:90%;
-      max-width:600px;
-      text-align:center;
-      padding:30px;
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #050914;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
     }
 
-    h1{
-      color:#29a9ff;
-      font-size:42px;
+    .box {
+      width: 100%;
+      max-width: 620px;
+      padding: 35px 25px;
+      text-align: center;
     }
 
-    input{
-      width:100%;
-      height:58px;
-      box-sizing:border-box;
-      margin:10px 0;
-      padding:15px;
-      border-radius:12px;
-      border:1px solid #52709b;
-      background:#07132d;
-      color:white;
-      font-size:18px;
+    h1 {
+      margin: 0 0 12px;
+      font-size: 42px;
+      color: #29a9ff;
     }
 
-    button{
-      width:100%;
-      height:58px;
-      margin:10px 0;
-      border:0;
-      border-radius:12px;
-      background:#269cff;
-      color:white;
-      font-size:18px;
-      font-weight:bold;
-      cursor:pointer;
-      position:relative;
-      z-index:9999;
+    .sub {
+      font-size: 18px;
+      margin-bottom: 30px;
+      color: #ddd;
     }
 
-    button:disabled{
-      opacity:.6;
+    input {
+      width: 100%;
+      height: 58px;
+      border-radius: 12px;
+      border: 1px solid #52709b;
+      background: #07132d;
+      color: white;
+      padding: 0 18px;
+      font-size: 18px;
+      outline: none;
+      margin-bottom: 12px;
+    }
+
+    button {
+      width: 100%;
+      height: 58px;
+      border: 0;
+      border-radius: 12px;
+      background: #269cff;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     #otpBox,
-    #payBox{
-      display:none;
+    #payBox {
+      display: none;
+      margin-top: 10px;
     }
 
-    #msg{
-      min-height:30px;
-      margin-top:15px;
-      color:#ffd84d;
-      white-space:pre-wrap;
+    #msg {
+      min-height: 28px;
+      margin-top: 10px;
+      color: #ffd84d;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .small {
+      color: #999;
+      font-size: 13px;
+      margin-top: 12px;
     }
   </style>
 </head>
@@ -81,7 +100,9 @@
 
   <h1>AIvera Premium</h1>
 
-  <p>Premium AI Tools Directory Access</p>
+  <div class="sub">
+    Premium AI Tools Directory Access
+  </div>
 
   <div id="loginBox">
 
@@ -93,14 +114,11 @@
       placeholder="Enter 10-digit mobile number"
     >
 
-    <button
-      type="button"
-      id="sendBtn">
+    <button id="sendBtn" onclick="sendOTP()">
       Send OTP
     </button>
 
   </div>
-
 
   <div id="otpBox">
 
@@ -112,16 +130,15 @@
       placeholder="Enter OTP"
     >
 
-    <button type="button" id="verifyBtn">
+    <button id="verifyBtn" onclick="verifyOTP()">
       Verify OTP
     </button>
 
-    <button type="button" id="resendBtn">
+    <button id="resendBtn" onclick="resendOTP()">
       Resend OTP
     </button>
 
   </div>
-
 
   <div id="payBox">
 
@@ -129,48 +146,676 @@
 
     <p>One-time payment: ₹20</p>
 
-    <button type="button" id="payBtn">
+    <button onclick="payNow()">
       Pay ₹20
     </button>
 
   </div>
 
-
   <div id="msg"></div>
+
+  <div class="small">
+    Secure OTP verification powered by MSG91
+  </div>
 
 </div>
 
 
-<!-- ================================================= -->
-<!-- ALL JAVASCRIPT IS HERE -->
-<!-- ================================================= -->
-
 <script>
 
-const WIDGET_ID = "36696b634d3333333836323336";
+  /* =====================================================
+     MSG91 CONFIGURATION
+     EXACT VALUES FROM YOUR MSG91 INTEGRATION SCREEN
+     ===================================================== */
 
-const TOKEN = "569942T8YbLOWaARc6aa3789aP1";
+  const WIDGET_ID = "36696b634d3333333836323336";
 
-let reqId = "";
-
-let msg91Ready = false;
-
-
-function show(text) {
-  document.getElementById("msg").textContent = text;
-}
+  const TOKEN = "569942T8YbLOWaARc6aa3789aP1";
 
 
-/* =========================
-   SEND OTP BUTTON
-   ========================= */
+  let reqId = "";
 
-document.getElementById("sendBtn").addEventListener("click", function () {
+  let ready = false;
 
-  const mobile =
-    document.getElementById("mobile").value
-      .replace(/\D/g, "");
 
-  if (mobile.length !== 10) {
+  function show(message) {
+    document.getElementById("msg").textContent = message || "";
+  }
 
-    show("Please
+
+  function cleanMobile() {
+
+    let mobile =
+      document.getElementById("mobile").value
+        .replace(/\D/g, "");
+
+    if (mobile.startsWith("91") && mobile.length === 12) {
+      mobile = mobile.substring(2);
+    }
+
+    return mobile;
+  }
+
+
+  function fullMobile() {
+
+    const mobile = cleanMobile();
+
+    return "91" + mobile;
+  }
+
+
+  function checkMobile() {
+
+    const mobile = cleanMobile();
+
+    if (mobile.length !== 10) {
+
+      show("Please enter a valid 10-digit mobile number.");
+
+      return false;
+    }
+
+    return true;
+  }
+
+
+  /*
+   * MSG91 SUCCESS CALLBACK
+   */
+  function msg91Success(data) {
+
+    console.log("MSG91 SUCCESS:", data);
+
+    /*
+     * Do not automatically verify here.
+     * Send OTP only stores reqId.
+     */
+
+    if (data && data.reqId) {
+      reqId = data.reqId;
+    }
+
+  }
+
+
+  /*
+   * MSG91 FAILURE CALLBACK
+   */
+  function msg91Failure(error) {
+
+    console.error("MSG91 FAILURE:", error);
+
+    let text = "OTP failed.";
+
+    try {
+
+      if (typeof error === "string") {
+        text += " " + error;
+      }
+
+      else if (error && error.message) {
+        text += " " + error.message;
+      }
+
+      else if (error) {
+        text += " " + JSON.stringify(error);
+      }
+
+    } catch (e) {}
+
+    show(text);
+  }
+
+
+  /*
+   * MSG91 WIDGET CONFIG
+   */
+  const configuration = {
+
+    widgetId: WIDGET_ID,
+
+    tokenAuth: TOKEN,
+
+    identifier: "",
+
+    exposeMethods: true,
+
+    captchaRenderId: "",
+
+    success: msg91Success,
+
+    failure: msg91Failure
+
+  };
+
+
+  /*
+   * SEND OTP
+   */
+  function sendOTP() {
+
+    if (!ready) {
+
+      show("MSG91 is still loading. Please wait 2 seconds.");
+
+      return;
+    }
+
+
+    if (!checkMobile()) {
+      return;
+    }
+
+
+    const number = fullMobile();
+
+
+    const button = document.getElementById("sendBtn");
+
+    button.disabled = true;
+
+    show("Sending OTP...");
+
+
+    try {
+
+      window.sendOtp(
+
+        number,
+
+        function(data) {
+
+          console.log("SEND OTP SUCCESS:", data);
+
+          if (data && data.reqId) {
+            reqId = data.reqId;
+          }
+
+          document.getElementById("otpBox").style.display = "block";
+
+          show("OTP sent successfully. Check your SMS.");
+
+          button.disabled = false;
+
+        },
+
+        function(error) {
+
+          console.error("SEND OTP ERROR:", error);
+
+          msg91Failure(error);
+
+          button.disabled = false;
+
+        }
+
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      show("OTP failed: " + error.message);
+
+      button.disabled = false;
+    }
+
+  }
+
+
+  /*
+   * VERIFY OTP
+   */
+  function verifyOTP() {
+
+    const otp =
+      document.getElementById("otp").value
+        .replace(/\D/g, "");
+
+
+    if (!otp) {
+
+      show("Please enter the OTP.");
+
+      return;
+    }
+
+
+    if (!reqId) {
+
+      show("OTP request ID missing. Please send OTP again.");
+
+      return;
+    }
+
+
+    const button = document.getElementById("verifyBtn");
+
+    button.disabled = true;
+
+    show("Verifying OTP...");
+
+
+    try {
+
+      window.verifyOtp(
+
+        otp,
+
+        async function(data) {
+
+          console.log("VERIFY SUCCESS:", data);
+
+          let accessToken = "";
+
+
+          /*
+           * MSG91 normally returns accessToken.
+           * Handle a few possible response shapes.
+           */
+
+          if (data && typeof data === "object") {
+
+            accessToken =
+              data.accessToken ||
+              data["access-token"] ||
+              data.token ||
+              data.access_token ||
+              "";
+
+          }
+
+
+          if (!accessToken && typeof data === "string") {
+            accessToken = data;
+          }
+
+
+          if (!accessToken) {
+
+            console.error("No access token:", data);
+
+            show("OTP verified, but access token was not received.");
+
+            button.disabled = false;
+
+            return;
+          }
+
+
+          /*
+           * SEND MSG91 ACCESS TOKEN TO OUR CLOUDFLARE WORKER
+           */
+          const response = await fetch(
+            "/api/msg91/verify",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type": "application/json"
+              },
+
+              credentials: "include",
+
+              body: JSON.stringify({
+                accessToken: accessToken
+              })
+            }
+          );
+
+
+          const result = await response.json().catch(() => ({}));
+
+
+          console.log("SERVER VERIFY:", result);
+
+
+          if (!response.ok) {
+
+            show(
+              result.error ||
+              "Server verification failed."
+            );
+
+            button.disabled = false;
+
+            return;
+          }
+
+
+          /*
+           * ALREADY PREMIUM
+           */
+          if (result.premium === true) {
+
+            show("Premium already active. Opening...");
+
+            setTimeout(function() {
+
+              location.href = "/directory.html";
+
+            }, 700);
+
+            return;
+          }
+
+
+          /*
+           * NOT PREMIUM → PAYMENT
+           */
+          document.getElementById("loginBox").style.display = "none";
+
+          document.getElementById("otpBox").style.display = "none";
+
+          document.getElementById("payBox").style.display = "block";
+
+          show("Mobile verified. Please complete the ₹20 payment.");
+
+          button.disabled = false;
+
+        },
+
+        function(error) {
+
+          console.error("VERIFY ERROR:", error);
+
+          msg91Failure(error);
+
+          button.disabled = false;
+
+        },
+
+        reqId
+
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      show("Verification failed: " + error.message);
+
+      button.disabled = false;
+    }
+
+  }
+
+
+  /*
+   * RESEND OTP
+   */
+  function resendOTP() {
+
+    if (!reqId) {
+
+      show("Please send OTP first.");
+
+      return;
+    }
+
+
+    const number = fullMobile();
+
+    show("Resending OTP...");
+
+
+    try {
+
+      window.retryOtp(
+
+        null,
+
+        function(data) {
+
+          console.log("RESEND SUCCESS:", data);
+
+          if (data && data.reqId) {
+            reqId = data.reqId;
+          }
+
+          show("OTP resent successfully.");
+
+        },
+
+        function(error) {
+
+          console.error("RESEND ERROR:", error);
+
+          msg91Failure(error);
+
+        },
+
+        reqId
+
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      show("Resend failed: " + error.message);
+    }
+
+  }
+
+
+  /*
+   * PAYMENT
+   */
+  async function payNow() {
+
+    show("Creating secure payment order...");
+
+
+    try {
+
+      const response = await fetch(
+        "/api/create-order",
+        {
+          method: "POST",
+
+          credentials: "include"
+        }
+      );
+
+
+      const order = await response.json().catch(() => ({}));
+
+
+      if (!response.ok) {
+
+        show(
+          order.error ||
+          "Unable to create payment order."
+        );
+
+        return;
+      }
+
+
+      /*
+       * If database already says premium
+       */
+      if (order.premium === true) {
+
+        location.href = "/directory.html";
+
+        return;
+      }
+
+
+      if (!order.order_id) {
+
+        show("Razorpay order was not created.");
+
+        return;
+      }
+
+
+      const options = {
+
+        key: order.key_id,
+
+        amount: order.amount,
+
+        currency: order.currency,
+
+        name: "AIvera Premium",
+
+        description: "Premium AI Tools Directory Access",
+
+        order_id: order.order_id,
+
+
+        handler: async function(payment) {
+
+          show("Verifying payment...");
+
+
+          try {
+
+            const verifyResponse = await fetch(
+              "/api/verify-payment",
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type": "application/json"
+                },
+
+                credentials: "include",
+
+                body: JSON.stringify({
+
+                  razorpay_payment_id:
+                    payment.razorpay_payment_id,
+
+                  razorpay_order_id:
+                    payment.razorpay_order_id,
+
+                  razorpay_signature:
+                    payment.razorpay_signature
+
+                })
+              }
+            );
+
+
+            const result =
+              await verifyResponse.json().catch(() => ({}));
+
+
+            if (!verifyResponse.ok) {
+
+              show(
+                result.error ||
+                "Payment verification failed."
+              );
+
+              return;
+            }
+
+
+            show("Payment successful. Opening Premium...");
+
+
+            setTimeout(function() {
+
+              location.href = "/directory.html";
+
+            }, 700);
+
+
+          } catch (error) {
+
+            console.error(error);
+
+            show("Payment verification failed.");
+
+          }
+
+        },
+
+
+        modal: {
+
+          ondismiss: function() {
+
+            show("Payment cancelled.");
+
+          }
+
+        }
+
+      };
+
+
+      const razorpay =
+        new Razorpay(options);
+
+
+      razorpay.open();
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      show("Payment system error.");
+
+    }
+
+  }
+
+
+  /*
+   * MSG91 SDK LOAD
+   */
+  window.addEventListener("load", function() {
+
+    console.log("AIvera MSG91 configuration loaded.");
+
+    console.log("Widget ID:", WIDGET_ID);
+
+
+    if (typeof window.initSendOTP !== "function") {
+
+      show("MSG91 SDK failed to load.");
+
+      return;
+    }
+
+
+    try {
+
+      window.initSendOTP(configuration);
+
+      ready = true;
+
+      console.log("MSG91 SDK initialized.");
+
+    } catch (error) {
+
+      console.error("MSG91 INIT ERROR:", error);
+
+      show("MSG91 initialization failed.");
+
+    }
+
+  });
+
+</script>
+
+
+<!-- Razorpay -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+
+<!-- MSG91 OTP Widget -->
+<script
+  src="https://verify.msg91.com/otp-provider.js">
+</script>
+
+</body>
+</html>
